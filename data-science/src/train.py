@@ -30,13 +30,18 @@ def parse_args():
 
     return args
 
-def encode_objects(df: pd.DataFrame) -> pd.DataFrame:
-    """Label-encode all object (string) columns, across train/test """
-    df = df.copy()
-    obj_cols = df.select_dtypes(include=["object"]).columns
-    for col in obj_cols:
-        df[col] = LabelEncoder().fit_transform(df[col].astype(str))
-    return df
+def _pick_csv(path: str) -> str:
+    files = [f for f in os.listdir(path) if f.lower().endswith(".csv")]
+    if not files:
+        raise FileNotFoundError(f"No CSV found in {path}. Contents: {os.listdir(path)}")
+    return os.path.join(path, files[0])
+
+def _find_target_name(cols, name="Price"):
+    # Case-insensitive match for "Price"
+    for c in cols:
+        if c.lower() == name.lower():
+            return c
+    raise KeyError(f"Target column '{name}' not found. Columns: {list(cols)}")
 
 def main(args):
     '''Read train and test datasets, train model, evaluate model, save trained model'''
@@ -50,51 +55,52 @@ def main(args):
     # Step 6: Predict target values on the test dataset using the trained model, and calculate the mean squared error.  
     # Step 7: Log the MSE metric in MLflow for model evaluation, and save the trained model to the specified output path.  
 
-    # Reading Data
-    df = pd.read_csv(args.raw_data)
-    
-    train_df, test_df = train_test_split(
-        df,
-        test_size=args.test_train_ratio,
+     mlflow.start_run()
+
+    # Read data (each input is a folder -> pick the CSV inside - defined in previous step)
+    train_df = pd.read_csv(_pick_csv(args.train_data))
+    test_df = pd.read_csv(_pick_csv(args.test_data))
+
+    # Split features/target
+    target_col = _find_target_name(train_df.columns, "Price")
+    train_df[target_col] = pd.to_numeric(train_df[target_col], errors="coerce")
+    test_df[target_col] = pd.to_numeric(test_df[target_col], errors="coerce")
+    train_df = train_df.dropna(subset=[target_col])
+    test_df = test_df.dropna(subset=[target_col])
+
+    X_train = train_df.drop(columns=[target_col])
+    y_train = train_df[target_col]
+    X_test = test_df.drop(columns=[target_col])
+    y_test = test_df[target_col]
+
+    # Train
+    model = RandomForestRegressor(
+        n_estimators=args.n_estimators,
+        max_depth=args.max_depth,
         random_state=42,
-        shuffle=True,
-        stratify=None 
-    )
-    
-    train_dir = Path(args.train_data)
-    test_dir = Path(args.test_data)
-    train_dir.mkdir(parents=True, exist_ok=True)
-    test_dir.mkdir(parents=True, exist_ok=True)
-    
-    train_path = train_dir / "data.csv"
-    test_path  = test_dir / "data.csv"
-    train_df.to_csv(train_path, index=False)
-    test_df.to_csv(test_path, index=False)
-    
-    mlflow.log_metric("train_rows", int(len(train_df)))
-    mlflow.log_metric("test_rows", int(len(test_df)))
-    
-    with open(train_dir / "_columns.txt", "w") as f:
-        f.write("\n".join(train_df.columns))
+        n_jobs=-1,
+    ).fit(X_train, y_train)
 
-if __name__ == "__main__":
-    
-    mlflow.start_run()
+    mlflow.log_param("model", "RandomForestRegressor")
+    mlflow.log_param("n_estimators", args.n_estimators)
+    mlflow.log_param("max_depth", args.max_depth)
 
-    # Parse Arguments
-    args = parse_args()
+    y_pred = model.predict(X_test)
+    mse = float(mean_squared_error(y_test, y_pred))
+    print(f"The MSE of the random forest regressor on the test set is: {mse:.2f}")
+    # IMPORTANT: The primary_metric is "MSE" 
+    mlflow.log_metric("MSE", mse)
 
-    lines = [
-        f"Train dataset input path: {args.train_data}",
-        f"Test dataset input path: {args.test_data}",
-        f"Model output path: {args.model_output}",
-        f"Number of Estimators: {args.n_estimators}",
-        f"Max Depth: {args.max_depth}"
-    ]
-
-    for line in lines:
-        print(line)
-
-    main(args)
+    Path(args.model_output).mkdir(parents=True, exist_ok=True)
+    mlflow.sklearn.save_model(sk_model=model, path=args.model_output)
 
     mlflow.end_run()
+
+if __name__ == "__main__":
+    args = parse_args()
+    print(f"Train dataset input path: {args.train_data}")
+    print(f"Test dataset input path:  {args.test_data}")
+    print(f"Model output path:        {args.model_output}")
+    print(f"n_estimators:              {args.n_estimators}")
+    print(f"max_depth:                 {args.max_depth}")
+    main(args)
