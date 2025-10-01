@@ -1,17 +1,14 @@
 channels:
-  - defaults
-  - anaconda
   - conda-forge
 dependencies:
-  - python=3.7.5
+  - python=3.8
   - pip
+  - scikit-learn=1.0.2
+  - pandas=1.5.3
+  - numpy
   - pip:
-      - azureml-mlflow==1.38.0
-      - azure-ai-ml==1.0.0
-      - pyarrow==10.0.0
-      - scikit-learn==0.24.1
-      - pandas==1.2.1
-      - joblib==1.0.0
-      - matplotlib==3.3.3
+      - mlflow==2.8.1
+      - azure-mlflow==1.51.0
+      - cloudpickle==2.2.1
       - git+https://github.com/microsoft/AzureML-Observability#subdirectory=aml-obs-client
       - git+https://github.com/microsoft/AzureML-Observability#subdirectory=aml-obs-collector
