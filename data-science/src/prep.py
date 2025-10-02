@@ -37,6 +37,14 @@ def main(args):  # Write the function name for the main data preparation logic
 
     # Reading Data
     df = pd.read_csv(args.raw_data)
+
+    target_col = next((c for c in df.columns if c.lower() == "price"), None)
+    if target_col is None:
+        raise KeyError(f"'Price' column not found. Columns: {list(df.columns)}")
+    df[target_col] = pd.to_numeric(df[target_col], errors="coerce")
+    df = df.dropna(subset=[target_col])
+
+    df=encode_objects(df)
     
     train_df, test_df = train_test_split(
         df,
@@ -61,6 +69,9 @@ def main(args):  # Write the function name for the main data preparation logic
     
     with open(train_dir / "_columns.txt", "w") as f:
         f.write("\n".join(train_df.columns))
+
+    print(f"Wrote: {train_path} and {test_path}")
+    print("Dtypes after encoding:\n", train_df.dtypes)
 
     # ------- WRITE YOUR CODE HERE -------
 
