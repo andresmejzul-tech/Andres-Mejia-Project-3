@@ -28,38 +28,32 @@ def main(args):
 
     mlflow.start_run()
 
-    print(f"Registering model: {args.model_name}")
-    print(f"Input model_path:  {args.model_path}")
+    print(f"[register] model_name={args.model_name}")
+    print(f"[register] model_path={args.model_path}")
+    print(f"[register] model_info_output_path={args.model_info_output_path}")
     
     model = mlflow.sklearn.load_model(args.model_path)
+    print("[register] Loaded model successfully.")
 
-    logged = mlflow.sklearn.log_model(
-        sk_model=model,
-        artifact_path="model",
-    )
-    model_uri = logged.model_uri
+    model_info = mlflow.sklearn.log_model(sk_model=model, artifact_path="model")
+    model_uri = model_info.model_uri
+    print(f"[register] Logged model to run as: {model_uri}")
 
-    registered = mlflow.register_model(model_uri=model_uri, name=args.model_name)
-
-    Path(args.model_info_output_path).mkdir(parents=True, exist_ok=True)
-    info_path = Path(args.model_info_output_path) / "model_info.json"
-
-    client = MlflowClient()
+    registered = mlflow.register_model(model_uri=model_uri, name=args.model_name, await_registration_for=90)
     model_version = registered.version
     model_name = registered.name
-    model_details = {
-        "model_name": model_name,
-        "model_version": model_version,
-        "model_uri": model_uri,
-    }
+    print(f"[register] Registered {model_name} v{model_version}")
+
+    out_dir = Path(args.model_info_output_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    info_path = out_dir / "model_info.json"
     with open(info_path, "w") as f:
-        json.dump(model_details, f)
+        json.dump({"model_name": model_name, "model_version": model_version, "model_uri": model_uri}, f)
+    (out_dir / "_SUCCESS").write_text("ok")
 
-    print(f"Registered {model_name} v{model_version}")
-    print(f"Wrote: {info_path}")
-    
+    print(f"[register] Wrote: {info_path}")
     mlflow.end_run()
-
+    
     # -----------  WRITE YOR CODE HERE -----------
     
     # Step 1: Load the model from the specified path using `mlflow.sklearn.load_model` for further processing.  
