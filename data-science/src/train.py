@@ -5,6 +5,7 @@ Trains ML model using training dataset and evaluates using test dataset. Saves t
 """
 
 import argparse
+import os
 from pathlib import Path
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
