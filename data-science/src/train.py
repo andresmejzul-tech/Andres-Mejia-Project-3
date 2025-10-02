@@ -56,8 +56,13 @@ def main(args):
     # Step 6: Predict target values on the test dataset using the trained model, and calculate the mean squared error.  
     # Step 7: Log the MSE metric in MLflow for model evaluation, and save the trained model to the specified output path.  
 
-    mlflow.start_run()
+    started_here = False
+    if mlflow.active_run() is None:
+        mlflow.start_run()
+        started_here = True
 
+    print("[train] active run id:", mlflow.active_run().info.run_id)
+  
     # Read data (each input is a folder -> pick the CSV inside - defined in previous step)
     train_df = pd.read_csv(_pick_csv(args.train_data))
     test_df = pd.read_csv(_pick_csv(args.test_data))
@@ -88,14 +93,15 @@ def main(args):
 
     y_pred = model.predict(X_test)
     mse = float(mean_squared_error(y_test, y_pred))
-    print(f"The MSE of the random forest regressor on the test set is: {mse:.2f}")
+    print(f"The MSE of the random forest regressor on the test set is: {mse:.4f}")
     # IMPORTANT: The primary_metric is "MSE" 
     mlflow.log_metric("MSE", mse)
 
     Path(args.model_output).mkdir(parents=True, exist_ok=True)
     mlflow.sklearn.save_model(sk_model=model, path=args.model_output)
 
-    mlflow.end_run()
+    if started_here:
+        mlflow.end_run()
 
 if __name__ == "__main__":
     args = parse_args()
