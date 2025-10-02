@@ -55,7 +55,7 @@ def main(args):
     # Step 6: Predict target values on the test dataset using the trained model, and calculate the mean squared error.  
     # Step 7: Log the MSE metric in MLflow for model evaluation, and save the trained model to the specified output path.  
 
-     mlflow.start_run()
+    mlflow.start_run()
 
     # Read data (each input is a folder -> pick the CSV inside - defined in previous step)
     train_df = pd.read_csv(_pick_csv(args.train_data))
